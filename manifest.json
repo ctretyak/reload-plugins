@@ -1,7 +1,7 @@
 {
 	"id": "reload-plugins",
 	"name": "Reload Plugins",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"minAppVersion": "0.15.0",
 	"description": "Automatically reload a specified plugin at regular intervals.",
 	"author": "ctretyak",
