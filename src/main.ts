@@ -1,99 +1,161 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { Notice, Plugin } from "obsidian";
+import {
+	DEFAULT_SETTINGS,
+	ReloadPluginsSettings,
+	ReloadPluginsSettingTab,
+} from "./settings";
 
-// Remember to rename these classes and interfaces!
-
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class ReloadPluginsPlugin extends Plugin {
+	settings: ReloadPluginsSettings;
+	private reloadIntervalId: number | null = null;
 
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		this.debugLog("Plugin loaded", {
+			targetPluginId: this.settings.targetPluginId,
+			reloadInterval: this.settings.reloadInterval,
+			reloadDelay: this.settings.reloadDelay,
+			enabled: this.settings.enabled,
 		});
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
+		this.addSettingTab(new ReloadPluginsSettingTab(this.app, this));
 
-		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
+			id: "reload-target-plugin",
+			name: "Reload target plugin now",
 			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			}
+				void this.reloadTargetPlugin();
+			},
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
+		this.restartReloadInterval();
 	}
 
 	onunload() {
+		this.debugLog("Plugin unloading");
+		this.stopReloadInterval();
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			(await this.loadData()) as Partial<ReloadPluginsSettings>
+		);
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
-}
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
+	restartReloadInterval() {
+		this.stopReloadInterval();
+
+		if (!this.settings.enabled || !this.settings.targetPluginId) {
+			this.debugLog("Interval not started", {
+				enabled: this.settings.enabled,
+				targetPluginId: this.settings.targetPluginId,
+			});
+			return;
+		}
+
+		const intervalMs = this.settings.reloadInterval * 60 * 1000;
+		this.reloadIntervalId = window.setInterval(() => {
+			void this.reloadTargetPlugin();
+		}, intervalMs);
+
+		this.registerInterval(this.reloadIntervalId);
+		this.debugLog("Reload interval started", {
+			intervalMs,
+			intervalMinutes: this.settings.reloadInterval,
+			targetPluginId: this.settings.targetPluginId,
+		});
 	}
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
+	stopReloadInterval() {
+		if (this.reloadIntervalId !== null) {
+			window.clearInterval(this.reloadIntervalId);
+			this.debugLog("Reload interval stopped");
+			this.reloadIntervalId = null;
+		}
 	}
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
+	debugLog(message: string, data?: Record<string, unknown>) {
+		if (this.settings.debugMode) {
+			const logData = data ? ` ${JSON.stringify(data)}` : "";
+			// eslint-disable-next-line no-console
+			console.log(`[Reload Plugins] ${message}${logData}`);
+		}
+	}
+
+	async reloadTargetPlugin() {
+		if (!this.settings.targetPluginId) {
+			this.debugLog("Reload skipped: no target plugin ID");
+			return;
+		}
+
+		this.debugLog("Starting plugin reload", {
+			targetPluginId: this.settings.targetPluginId,
+		});
+
+		// @ts-expect-error - plugins.enabledPlugins exists but not in type definitions
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+		const enabledPlugins = this.app.plugins.enabledPlugins as
+			| Set<string>
+			| undefined;
+		const isEnabled =
+			enabledPlugins?.has(this.settings.targetPluginId) ?? false;
+
+		this.debugLog("Plugin status check", {
+			targetPluginId: this.settings.targetPluginId,
+			isEnabled,
+		});
+
+		try {
+			if (isEnabled) {
+				this.debugLog("Disabling plugin", {
+					targetPluginId: this.settings.targetPluginId,
+				});
+				// @ts-expect-error - disablePlugin exists but not in type definitions
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+				await this.app.plugins.disablePlugin(
+					this.settings.targetPluginId
+				);
+				this.debugLog("Plugin disabled", {
+					targetPluginId: this.settings.targetPluginId,
+				});
+
+				if (this.settings.reloadDelay > 0) {
+					const delayMs = this.settings.reloadDelay * 1000;
+					this.debugLog("Waiting delay", {
+						delaySeconds: this.settings.reloadDelay,
+						delayMs,
+					});
+					await new Promise<void>((resolve) => {
+						window.setTimeout(resolve, delayMs);
+					});
+					this.debugLog("Delay completed");
+				}
+			}
+
+			this.debugLog("Enabling plugin", {
+				targetPluginId: this.settings.targetPluginId,
+			});
+			// @ts-expect-error - enablePlugin exists but not in type definitions
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+			await this.app.plugins.enablePlugin(this.settings.targetPluginId);
+			this.debugLog("Plugin reload completed", {
+				targetPluginId: this.settings.targetPluginId,
+			});
+		} catch (error) {
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			this.debugLog("Plugin reload failed", {
+				targetPluginId: this.settings.targetPluginId,
+				error: errorMessage,
+			});
+			new Notice(`Failed to reload plugin: ${errorMessage}`);
+		}
 	}
 }
