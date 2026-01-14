@@ -4,6 +4,6 @@
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Automatically reload a specified plugin at regular intervals.",
-	"author": "",
+	"author": "ctretyak",
 	"isDesktopOnly": false
 }
