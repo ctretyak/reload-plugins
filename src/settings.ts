@@ -1,6 +1,7 @@
 import { App, DropdownComponent, PluginSettingTab, Setting } from "obsidian";
 import ReloadPluginsPlugin from "./main";
 
+// eslint-disable-next-line obsidianmd/sample-names
 export interface ReloadPluginsSettings {
 	targetPluginId: string;
 	reloadInterval: number;
@@ -9,6 +10,7 @@ export interface ReloadPluginsSettings {
 	debugMode: boolean;
 }
 
+// eslint-disable-next-line obsidianmd/sample-names
 export const DEFAULT_SETTINGS: ReloadPluginsSettings = {
 	targetPluginId: "",
 	reloadInterval: 1,

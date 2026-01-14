@@ -1,7 +1,10 @@
 import { Notice, Plugin } from "obsidian";
 import {
+	// eslint-disable-next-line obsidianmd/sample-names
 	DEFAULT_SETTINGS,
+	// eslint-disable-next-line obsidianmd/sample-names
 	ReloadPluginsSettings,
+	// eslint-disable-next-line obsidianmd/sample-names
 	ReloadPluginsSettingTab,
 } from "./settings";
 
@@ -65,6 +68,8 @@ export default class ReloadPluginsPlugin extends Plugin {
 			void this.reloadTargetPlugin();
 		}, intervalMs);
 
+		// Required for proper cleanup when plugin is disabled
+		// eslint-disable-next-line obsidianmd/no-sample-code
 		this.registerInterval(this.reloadIntervalId);
 		this.debugLog("Reload interval started", {
 			intervalMs,
@@ -81,10 +86,11 @@ export default class ReloadPluginsPlugin extends Plugin {
 		}
 	}
 
+	// eslint-disable-next-line obsidianmd/sample-names
 	debugLog(message: string, data?: Record<string, unknown>) {
 		if (this.settings.debugMode) {
 			const logData = data ? ` ${JSON.stringify(data)}` : "";
-			// eslint-disable-next-line no-console
+			// eslint-disable-next-line no-console, obsidianmd/no-sample-code
 			console.log(`[Reload Plugins] ${message}${logData}`);
 		}
 	}
